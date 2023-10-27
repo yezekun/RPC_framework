@@ -5,7 +5,7 @@
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <stdexcept>
-namespace RPC_FRAMEWORK_LOG
+namespace RPC_FRAMEWORK::LOG
 {
     class GlobalLogger
     {
