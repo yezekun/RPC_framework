@@ -1,4 +1,6 @@
+#pragma once
 #include "common/log.hh"
+#include "socket/socket_message.hh"
 #include <arpa/inet.h>
 #include <cstdio>
 #include <sys/socket.h>
@@ -16,8 +18,8 @@ class socket_server {
 
         server_addr_.sin_family = AF_INET; // IPv4 网络协议的套接字类型
         server_addr_.sin_addr.s_addr =
-            htonl(INADDR_ANY); // 32位IP地址 此处接收任何传入消息的地址
-        server_addr_.sin_port = port;
+            htons(INADDR_ANY); // 32位IP地址 此处接收任何传入消息的地址
+        server_addr_.sin_port = htons(port);
 
         server_socket_fd_ = socket(AF_INET, SOCK_STREAM, 0);
         if (server_socket_fd_ < 0) {
@@ -26,20 +28,20 @@ class socket_server {
             RPC_FRAMEWORK::LOG::trace("Server socket create success!");
         }
     };
-    auto socket_listen(bool *close_bool) -> int32_t;
+    auto socket_listen() -> int32_t;
 };
 
 class socket_client {
   private:
     uint8_t socket_client_id_;
     uint32_t port_;
+    int32_t client_socket_fd_;
 
   public:
     socket_client(uint8_t socket_client_id, uint32_t port) {
         socket_client_id_ = socket_client_id;
         port_ = port;
     };
-    auto socket_client_connect() -> int; // 0 success;1 fail
-    auto socket_send(int sock_fd, void *buffer, size_t len) -> ssize_t;
+    auto socket_client_send() -> int; // 0 success;1 fail
 };
 }; // namespace RPC_FRAMEWORK::SOCKET
