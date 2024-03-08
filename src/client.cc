@@ -91,13 +91,26 @@ void Client::setupConnection(rdma_cm_id* client_id, uint32_t n_buffer_page) {
 }
 
 void Client::sendRequest(char* msg,uint32_t src_node_id,uint32_t next_node_id,uint32_t dst_node_id, uint32_t msglen,void* resp_addr) {
-  Message req(msg, src_node_id, dst_node_id, msglen, MessageType::ImmRequest,resp_addr);
-  req.set_temp_node(next_node_id);
-
+  info("老版本调用 sendRequest");
+  poller_.poll();
+  Message req(msg, src_node_id, dst_node_id, msglen, MessageType::ImmRequest,
+              resp_addr);
   poller_.sendRequest(req);
 }
-
-
+void Client::sendRequest(Message *req) {
+  info("新版本调用 sendRequest");
+  poller_.sendRequest(*req);
+}
+void Client::sendResponse(char* msg,uint32_t src_node_id,uint32_t next_node_id,uint32_t dst_node_id, uint32_t msglen,void* resp_addr) {
+  info("老版本调用 sendResponse");
+  Message req(msg, src_node_id, dst_node_id, msglen, MessageType::Response,
+              resp_addr);
+  poller_.sendRequest(req);
+}
+void Client::sendResponse(Message *req) {
+  info("新版本调用 sendResponse");
+  poller_.sendRequest(*req);
+}
 // /* ClientPoller */
 ClientPoller::ClientPoller() {
 
@@ -118,7 +131,8 @@ void ClientPoller::deregisterConn() {
 }
 
 void ClientPoller::sendRequest(Message req) {
-  conn_->lock(); // unlock when receive response;
+  info("Client::sendRequest conn->lock()");
+  // conn_->lock(); // unlock when receive response;
   conn_->fillMR((void*)&req, sizeof(req));
   // info("post send reqeust, req data is: %s", req.dataAddr());
 
@@ -133,7 +147,7 @@ void ClientPoller::sendRequest(Message req) {
 
 void ClientPoller::run() {
   running_.store(true, std::memory_order_release);
-  poll_thread_ = std::thread(&ClientPoller::poll, this);
+  // poll_thread_ = std::thread(&ClientPoller::poll, this);
   info("start running client poller");
 }
 
@@ -146,8 +160,8 @@ void ClientPoller::stop() {
 }
 
 void ClientPoller::poll() {
-  while (running_.load(std::memory_order_acquire)) {
+  // while (running_.load(std::memory_order_acquire)) {
     std::lock_guard<Spinlock> lock(lock_);
     conn_->poll();
-  }
+  // }
 }

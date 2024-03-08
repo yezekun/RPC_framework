@@ -52,7 +52,7 @@ public:
   void prepare();
   void poll();
   void serverAdvance(const ibv_wc &wc);
-  void clientAdvance(const ibv_wc &wc);
+  // void clientAdvance(const ibv_wc &wc);
   void* getMrBuffer() { return buffer_; }
 
 private:

@@ -44,18 +44,23 @@ public:
   void connect(const char *host, const char *port);
   rdma_cm_event* waitEvent(rdma_cm_event_type expected);
   void setupConnection(rdma_cm_id* cm_id, uint32_t n_buffer_page);
+  
+  void sendRequest(Message *req);
+  void sendRequest(char *msg, uint32_t src_node_id, uint32_t next_node_id,
+                   uint32_t dst_node_id, uint32_t msglen, void *resp_addr);
 
-  void sendRequest(char* msg, uint32_t src_node_id,uint32_t next_node_id,uint32_t dst_node_id,uint32_t msglen,void* resp_addr);
+  void sendResponse(Message *req);
+  void sendResponse(char *msg, uint32_t src_node_id,uint32_t next_node_id, uint32_t dst_node_id,uint32_t msglen, void *resp_addr);
 
 private:
   rdma_cm_id* cm_id_;  // only one qp, so only one cm_id
   addrinfo* dst_addr_{nullptr};
   rdma_event_channel* cm_event_channel_{nullptr};
 
-  // event-driven, to avoid the block
-  event_base* base_{nullptr};
-  event* conn_event_{nullptr};
-  event* exit_event_{nullptr};
+  // // event-driven, to avoid the block
+  // event_base* base_{nullptr};
+  // event* conn_event_{nullptr};
+  // event* exit_event_{nullptr};
 
   // connection related
   ClientPoller poller_{};

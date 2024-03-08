@@ -6,6 +6,7 @@
 #include <message.h>
 #include <assert.h>
 #include <record.h>
+#include <record.h>
 #include <context.h>
 
 /* Connection */
@@ -146,6 +147,7 @@ void Connection::fillMR(void* data, uint32_t size) {
 
 void Connection::prepare() {
   postRecv(buffer_mr_->addr, buffer_mr_->length, buffer_mr_->lkey);
+  info("prepare()");
   switch (role_) {
   case Role::ServerConn : {
     state_ = State::WaitingForRequest;
@@ -164,6 +166,7 @@ void Connection::prepare() {
 void Connection::poll() {
   static ibv_wc wc[DEFAULT_CQ_CAPACITY];
   int ret = ibv_poll_cq(local_cq_, DEFAULT_CQ_CAPACITY, wc);
+  // info("poll ret %d",ret);
   if (ret < 0) {
     info("poll cq error");
     return;
@@ -171,15 +174,17 @@ void Connection::poll() {
     // info("get no wc");
     return;
   }
-
+  
   for (int i = 0; i < ret; i++) {
     switch (role_){
     case Role::ServerConn: {
+      // info("poll server");
       serverAdvance(wc[i]);
       break;
     }
     case Role::ClientConn: {
-      clientAdvance(wc[i]);
+      info("poll client");
+      // clientAdvance(wc[i]);
       break;
     }
     }
@@ -189,78 +194,74 @@ void Connection::poll() {
 void Connection::serverAdvance(const ibv_wc &wc) {
   switch (wc.opcode) {
   case IBV_WC_RECV: {
+    
     assert(state_ == WaitingForRequest);
     Context* ctx = reinterpret_cast<Context*>(wc.wr_id);
     Message* req = reinterpret_cast<Message*>(ctx->addr());
+    info("收到请求或响应，距离该请求发出的时间，耗时:%d ns", req->GetTimeDifference());
     state_ = HandlingRequest;
     // info("server recive from client, start handling the request");
-    Message resp = handler_.handlerRequest(req);
-    // info("handle over");
-    // send resp
-    fillMR((void*)&resp, sizeof(resp));
-    postSend(getMRAddr(), sizeof(resp), getLKey(), false);
+    if(req->msgType() == Response){
+      info("Recv Response!!!");
+      info("收到response信息:\n from node %d to node %d \n msg is %s", req->getSrcNode(),
+          req->getDstNode(), req->dataAddr());
+      if(req->getDstNode()==Record::node_id_){
+        memcpy(req->getRespAddr(), req->dataAddr(), req->dataLen());
+        // std::lock_guard<std::mutex> lock(Record::mutex[1]);
+        // Record::resp_ready[1] = true;
+        // Record::cv[1].notify_one();  // 或使用 notify_all() 唤醒所有等待线程
+      }else{
+        int dst_node_id = req->getDstNode();
+        int next_node_id =
+        Record::graph_->next_node_id(Record::node_id_, dst_node_id);
+        if(next_node_id == -1){
+          exit(-1);
+        }else{
+          Record::clientArray_[next_node_id]->sendResponse(req);
+              // req->dataAddr(),  req->getSrcNode(), next_node_id, dst_node_id,
+              // req->dataLen(), req->getRespAddr());
+        }
+      }
+    }else{
+      info("Recv Request!!!");
+      Message *resp = handler_.handlerRequest(req);
+      // info("messgae addr req:%p ,resp:%p", req, resp);
+      // info("temp messgae :%s", req->dataAddr());
+      if (resp != nullptr) {
+        int dst_node_id = req->getDstNode();
+        int next_node_id =
+        Record::graph_->next_node_id(Record::node_id_, dst_node_id);
+        if(next_node_id == -1){
+          exit(-1);
+        }else{
+          Record::clientArray_[next_node_id]->sendResponse(resp);
+          // Record::clientArray_[next_node_id]->sendResponse(
+          //     resp->dataAddr(), Record::node_id_, next_node_id, dst_node_id,
+          //     resp->dataLen(), resp->getRespAddr());
+        }
+      }
+      // delete resp;
+    }
+    // delete req;
     delete ctx;
-    // state_ = WaitingForRequest;
-    break;
-  }
-  case IBV_WC_SEND: {
     assert(state_ == HandlingRequest);
     prepare();
-    // info("server response send completed, waiting for next request");
     state_ = WaitingForRequest;
     break;
   }
-  case IBV_WC_RDMA_READ: {
-    // todo
-    break;
-  }
-  case IBV_WC_RDMA_WRITE: {
-    // todo
-    break;
-  }
-  default: {
-    info("unexpected wc opcode: %d", wc.opcode);
-    break;
-  }
-  }
-}
-
-
-void Connection::clientAdvance(const ibv_wc &wc) {
-  switch (wc.opcode) {
   case IBV_WC_SEND: {
-    Context* ctx = reinterpret_cast<Context*>(wc.wr_id);
-    delete ctx;
-    state_ = WaitingForResponse;
-    // info("client request send completed, waiting for response");
-    break;
-  }
-  case IBV_WC_RECV: {
-    prepare();
-    assert(state_ == WaitingForResponse);
-    Context* ctx = reinterpret_cast<Context*>(wc.wr_id);
-    Message* resp = reinterpret_cast<Message*>(ctx->addr());
-    if(resp->msgType() == Response) {
-      // info("client receive response from server, resp data is: %s", resp->dataAddr());
-      memcpy(resp->getRespAddr(), resp->dataAddr(), resp->dataLen());
-      /* 唤醒等待的线程 */
-      // sleep(5);
-      info("解锁 %d", resp->get_temp_node());
-      
-      std::lock_guard<std::mutex> lock(Record::mutex[resp->get_temp_node()]);
-      Record::resp_ready[resp->get_temp_node()] = true;
-      Record::cv[resp->get_temp_node()].notify_one();  // 或使用 notify_all() 唤醒所有等待线程
-
-      // ((send_message *)req->dataAddr())->msg
-      state_ = Vacant;
-      unlock();
-    }
+    // assert(state_ == HandlingRequest);
+    // prepare();
+    // // info("server response send completed, waiting for next request");
+    // state_ = WaitingForRequest;
     break;
   }
   case IBV_WC_RDMA_READ: {
+    // todo
     break;
   }
   case IBV_WC_RDMA_WRITE: {
+    // todo
     break;
   }
   default: {
@@ -269,6 +270,34 @@ void Connection::clientAdvance(const ibv_wc &wc) {
   }
   }
 }
+
+
+// void Connection::clientAdvance(const ibv_wc &wc) {
+//   switch (wc.opcode) {
+//   case IBV_WC_SEND: {
+//     Context* ctx = reinterpret_cast<Context*>(wc.wr_id);
+//     delete ctx;
+//     state_ = WaitingForResponse;
+//     // info("client request send completed, waiting for response");
+//     state_ = Vacant;
+//     // unlock();
+//     break;
+//   }
+//   case IBV_WC_RECV: {
+//     break;
+//   }
+//   case IBV_WC_RDMA_READ: {
+//     break;
+//   }
+//   case IBV_WC_RDMA_WRITE: {
+//     break;
+//   }
+//   default: {
+//     info("unexpected wc opcode: %d", wc.opcode);
+//     break;
+//   }
+//   }
+// }
 
 void Connection::postSend(void* local_addr, uint32_t length, uint32_t lkey, bool need_inline){
   ibv_sge sge {
@@ -295,7 +324,7 @@ void Connection::postSend(void* local_addr, uint32_t length, uint32_t lkey, bool
 
   ibv_send_wr* bad_wr = nullptr;
 
-  // info("Connection::postSend前置操作时间：%d", ((Message*)local_addr)->GetTimeDifference());
+  info("Connection::postSend前置操作时间：%d", ((Message*)local_addr)->GetTimeDifference());
   // ((Message*)local_addr)->SetStartTime(std::chrono::high_resolution_clock::now());
 
   int ret = ibv_post_send(local_qp_, &wr, &bad_wr);

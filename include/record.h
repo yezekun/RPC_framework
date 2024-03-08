@@ -13,9 +13,9 @@ public:
   static Graph* graph_;
 
   // 
-  static std::mutex mutex[MAX_NODE_NUM];
-  static std::condition_variable cv[MAX_NODE_NUM];
-  static bool resp_ready[MAX_NODE_NUM];
+  // static std::mutex mutex[MAX_NODE_NUM];
+  // static std::condition_variable cv[MAX_NODE_NUM];
+  // static bool resp_ready[MAX_NODE_NUM];
 
 };
 

@@ -28,10 +28,13 @@ Server::Server(const char *host, const char *port) {
   // In order to avoid block
   base_ = event_base_new();
   checkNotEqual(base_, static_cast<event_base*>(nullptr), "event_base_new() failed");
+
   conn_event_ = event_new(base_, cm_event_channel_->fd, EV_READ | EV_PERSIST, &Server::onConnectionEvent, this); // bind the event to channel fd
   checkNotEqual(conn_event_, static_cast<event*>(nullptr), "event_new() failed to create conn_event");
+
   ret = event_add(conn_event_, nullptr); // register the event
   checkEqual(ret, 0, "event_add() failed to register conn_event");
+  
   info("base_new");
   sleep(1);
 }

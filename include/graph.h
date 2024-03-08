@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <const.h>
 #include <log.h>
+#include <record.h>
 #include <limits>
 // const int INF = std::numeric_limits<int>::max();  // 无穷大
 struct nodeinformation{
@@ -81,5 +82,25 @@ public:
     }
     std::reverse(path.begin(), path.end());
     return path;
+  }
+
+  int next_node_id(int src_node_id,int dst_node_id){
+    std::vector<int> dist;  
+    std::vector<int> prev;
+    Record::graph_->dijkstra(src_node_id, dist, prev);
+    std::cout << "最短路径 from " << src_node_id << " to " << dst_node_id << ": ";
+    if (dist[dst_node_id] == std::numeric_limits<int>::max()) {// case 2: 不可到达
+      std::cout << "不可到达" << std::endl;
+      return -1;
+    } else {
+      std::vector<int> path = Record::graph_->reconstructPath(prev, dst_node_id);
+      for (int j = 0; j < path.size(); ++j) {
+        std::cout << path[j];
+        if (j != path.size() - 1)
+          std::cout << " -> ";
+      }
+      std::cout << std::endl;
+      return path[1];
+    }
   }
 };

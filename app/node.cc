@@ -30,32 +30,36 @@ void* run_server(void* args)
   node->nodeServerRun();
   return 0;
 }
- 
+
 void* run_client(void* args)
 {
   std::cout << "运行 client" << std::endl;
   node->nodeClientRun();
   sleep(10);
+  char tempstr[10];
+  Message temp(tempstr, 1, 1, 1, MessageType::ImmRequest, args);
   if(node->get_node_id()==0){
-    for (int i = 0; i < 5;i++){
+    char resp_addr[10][1025];
+    std::string msgtemp = generateRandomString(1024);
+    for (int i = 0; i < 2;i++){
+
+      // info("\n\n进入发送 %d 循环:%d ns",i, temp.GetTimeDifference());
       // TODO 修改
+      info("send %d message", i);
       uint32_t src_node_id = node->get_node_id();
-      uint32_t dst_node_id = node->get_node_id()+2;
-      std::string msgtemp = generateRandomString(1024);
-      
-      char *resp_addr = new char[1025];
-      msgtemp[1024] = 0, resp_addr[1024] = 0;
-      // info("resp_addr: %p", resp_addr);
-      std::unique_lock<std::mutex> lock(Record::mutex[1]);
-      // std::unique_lock<std::mutex> lock;
-      Record::resp_ready[1] = false;
+      uint32_t dst_node_id = node->get_node_id()+1;
+      // std::string msgtemp = generateRandomString(1024);
+      msgtemp[1024] = 0, resp_addr[i][1024] = 0;
+      info("发送 %d 的开始:%d ns",i, temp.GetTimeDifference());
       node->sendRequest((char *)msgtemp.c_str(), src_node_id, dst_node_id,
-                        msgtemp.length(), (void *)resp_addr);
-    // }
-      Record::cv[1].wait(lock, []() { return Record::resp_ready[1]; });
-      //TODO
-      info("resp_addr: %s", resp_addr);
+                        msgtemp.length(), (void *)resp_addr[i]);
+      info("发送 %d 结束:%d ns\n\n",i, temp.GetTimeDifference());
     }
+    sleep(30);
+    // for (int i = 0; i < 2;i++){
+    //   info("%d 收到回复: %s\n\n\n",i, resp_addr[i]);
+    // }
+
   }
   sleep(30);
   return 0;
@@ -120,6 +124,6 @@ int main([[gnu::unused]] int argc, char *argv[]) {
 Graph* Record::graph_ = nullptr;
 Client ** Record::clientArray_ = new Client*[MAX_NODE_NUM];
 int Record::node_id_ = -1;
-bool Record::resp_ready[MAX_NODE_NUM] = {false};
-std::mutex Record::mutex[MAX_NODE_NUM]{};
-std::condition_variable Record::cv[MAX_NODE_NUM]{};
+// bool Record::resp_ready[MAX_NODE_NUM] = {false};
+// std::mutex Record::mutex[MAX_NODE_NUM]{};
+// std::condition_variable Record::cv[MAX_NODE_NUM]{};
